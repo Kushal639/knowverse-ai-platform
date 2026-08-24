@@ -480,9 +480,45 @@ export function handleMockRoute(url: string, method: string, data?: any): any {
     return {
       success: true,
       data: {
+        message: answer,
         reply: answer,
-        sources: stateTriples.slice(0, 3),
-        confidence: 0.98,
+        answerType: 'KNOWVERSE_FACT',
+        confidence: 'HIGH',
+        confidenceScore: 0.98,
+        graphContext: stateTriples.slice(0, 3).map(t => ({
+          subject: t.subject,
+          relation: t.relation,
+          object: t.object,
+          confidence: t.confidence,
+          sourceDocument: 'AI Organizations Dataset',
+        })),
+        sources: [
+          {
+            documentTitle: 'AI Organizations & Ecosystem',
+            datasetName: 'Global AI Entities 2026',
+            confidence: 0.98,
+            snippet: 'Verified relationship triples stored in MySQL Knowledge Graph.',
+          }
+        ],
+        directFacts: stateTriples.slice(0, 2).map(t => ({
+          subject: t.subject,
+          relation: t.relation,
+          object: t.object,
+          confidence: t.confidence,
+        })),
+        graphPaths: [
+          {
+            path: ['Sam Altman', 'OpenAI', 'ChatGPT'],
+            description: 'Direct multi-hop relationship discovered in Knowledge Graph',
+            confidence: 0.96,
+          }
+        ],
+        groundedFacts: true,
+        suggestedQuestions: [
+          'Which students study Machine Learning?',
+          'How is Rohan Desai connected to Classification?',
+          'What are the key entities in this graph?'
+        ],
         conversationId: data?.conversationId || `conv-${Date.now()}`,
       },
     };
