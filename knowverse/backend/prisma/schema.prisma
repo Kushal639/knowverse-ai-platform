@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -119,7 +119,7 @@ model Document {
   id        String   @id @default(uuid())
   datasetId String   @map("dataset_id")
   title     String
-  content   String   @db.LongText
+  content   String   @db.Text
   source    String?
   metadata  Json?
   createdAt DateTime @default(now()) @map("created_at")
@@ -368,7 +368,7 @@ model AiMessage {
   id             String      @id @default(uuid())
   conversationId String      @map("conversation_id")
   role           MessageRole
-  content        String      @db.LongText
+  content        String      @db.Text
   metadata       Json?
   createdAt      DateTime    @default(now()) @map("created_at")
 
@@ -436,7 +436,7 @@ model SavedInsight {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   question  String   @db.Text
-  answer    String   @db.LongText
+  answer    String   @db.Text
   sources   Json?
   metadata  Json?
   createdAt DateTime @default(now()) @map("created_at")
