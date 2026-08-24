@@ -92,12 +92,14 @@ Sam Altman is the CEO of OpenAI.`,
     { id: 'ent-ai', name: 'Artificial Intelligence', normalizedName: 'artificial intelligence', entityType: 'CONCEPT' },
   ];
 
+  const entityMap = new Map<string, string>();
   for (const e of entityData) {
-    await prisma.entity.upsert({
+    const saved = await prisma.entity.upsert({
       where: { normalizedName: e.normalizedName },
       update: {},
       create: e,
     });
+    entityMap.set(e.id, saved.id);
   }
 
   console.log('✅ Entities created');
@@ -116,12 +118,14 @@ Sam Altman is the CEO of OpenAI.`,
     { id: 'rel-provides', name: 'provides', normalizedName: 'provides' },
   ];
 
+  const relationMap = new Map<string, string>();
   for (const r of relationData) {
-    await prisma.relation.upsert({
+    const saved = await prisma.relation.upsert({
       where: { normalizedName: r.normalizedName },
       update: {},
       create: r,
     });
+    relationMap.set(r.id, saved.id);
   }
 
   console.log('✅ Relations created');
@@ -142,17 +146,25 @@ Sam Altman is the CEO of OpenAI.`,
   ];
 
   for (const t of triplesData) {
+    const subId = entityMap.get(t.subjectEntityId) || t.subjectEntityId;
+    const relId = relationMap.get(t.relationId) || t.relationId;
+    const objId = entityMap.get(t.objectEntityId) || t.objectEntityId;
+
     await prisma.triple.upsert({
       where: {
         subjectEntityId_relationId_objectEntityId: {
-          subjectEntityId: t.subjectEntityId,
-          relationId: t.relationId,
-          objectEntityId: t.objectEntityId,
+          subjectEntityId: subId,
+          relationId: relId,
+          objectEntityId: objId,
         },
       },
       update: {},
       create: {
-        ...t,
+        subjectEntityId: subId,
+        relationId: relId,
+        objectEntityId: objId,
+        confidence: t.confidence,
+        status: t.status,
         sourceDocumentId: document.id,
         sourceText: 'Seeded data',
         extractionModel: 'seed',
