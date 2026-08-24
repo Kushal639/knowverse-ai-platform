@@ -35,7 +35,18 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: env.FRONTEND_URL,
+  origin: (requestOrigin, callback) => {
+    if (
+      !requestOrigin ||
+      requestOrigin === env.FRONTEND_URL ||
+      requestOrigin.endsWith('.vercel.app') ||
+      requestOrigin.startsWith('http://localhost:')
+    ) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Permissive for production deployment while preserving credentials
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
