@@ -16,10 +16,25 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("knowverse-ai")
 
+from contextlib import asynccontextmanager
+
+nlp = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global nlp
+    try:
+        nlp = spacy.load("en_core_web_sm")
+        logger.info("✅ spaCy model loaded: en_core_web_sm")
+    except OSError:
+        logger.warning("⚠️  spaCy model not found. Run: python -m spacy download en_core_web_sm")
+    yield
+
 app = FastAPI(
     title="KnowVerse AI Service",
     description="NLP pipeline for knowledge graph extraction",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -30,21 +45,9 @@ app.add_middleware(
 )
 
 # Health check endpoint
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     return {"status": "ok", "service": "knowverse-ai"}
-
-# Load spaCy model on startup
-nlp = None
-
-@app.on_event("startup")
-async def load_model():
-    global nlp
-    try:
-        nlp = spacy.load("en_core_web_sm")
-        logger.info("✅ spaCy model loaded: en_core_web_sm")
-    except OSError:
-        logger.warning("⚠️  spaCy model not found. Run: python -m spacy download en_core_web_sm")
 
 
 # ── Pydantic Models ──────────────────────────────────────────
@@ -61,6 +64,8 @@ class Triple(BaseModel):
     source_text: str
 
 class ExtractionResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     triples: List[Triple]
     entity_count: int
     sentence_count: int
