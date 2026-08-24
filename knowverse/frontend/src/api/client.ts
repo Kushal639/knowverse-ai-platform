@@ -11,16 +11,34 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor
+// Direct adapter for standalone Vercel cloud hosting
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // If on Vercel and no external API URL is set, resolve directly via mock fallback engine
+  if (typeof window !== 'undefined' && !customApiUrl && window.location.hostname.includes('vercel.app')) {
+    config.adapter = async (cfg) => {
+      const method = (cfg.method || 'get').toLowerCase();
+      const url = cfg.url || '';
+      const bodyData = cfg.data ? (typeof cfg.data === 'string' ? JSON.parse(cfg.data) : cfg.data) : undefined;
+      const mockData = handleMockRoute(url, method, bodyData);
+      return {
+        data: mockData,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: cfg,
+      };
+    };
+  }
+
   return config;
 });
 
-// Response interceptor with graceful mock fallback for standalone / Vercel cloud deployment
+// Response interceptor with graceful mock fallback for any unhandled network errors
 apiClient.interceptors.response.use(
   (response) => {
     // Detect if Vercel SPA rewrite returned index.html for an API route
@@ -34,7 +52,6 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    // If backend is unreachable or returns 405 (Method Not Allowed on static Vercel), 404, 500, 502, or Network Error
     if (error.config) {
       try {
         const method = (error.config.method || 'get').toLowerCase();
