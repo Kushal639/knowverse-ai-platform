@@ -18,9 +18,9 @@ services:
       - key: MYSQL_USER
         value: knowverse_user
       - key: MYSQL_PASSWORD
-        generateValue: true
+        value: knowverse_secret_pass_2026
       - key: MYSQL_ROOT_PASSWORD
-        generateValue: true
+        value: knowverse_root_pass_2026
 
   # ─────────────────────────────────────────────────────────────
   # 2. Python AI / NLP Microservice (Web Service)
@@ -29,7 +29,7 @@ services:
     name: knowverse-ai
     env: python
     rootDir: knowverse/ai-service
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
@@ -44,7 +44,7 @@ services:
     name: knowverse-backend
     env: node
     rootDir: knowverse/backend
-    plan: starter
+    plan: free
     buildCommand: npm install && npx prisma generate && npm run build
     startCommand: npx prisma db push && node dist/server.js
     healthCheckPath: /health
@@ -52,14 +52,11 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromService:
-          type: pserv
-          name: knowverse-mysql
-          property: connectionString
+        value: mysql://knowverse_user:knowverse_secret_pass_2026@knowverse-mysql:3306/knowverse
       - key: JWT_SECRET
-        generateValue: true
+        value: knowverse-super-secret-jwt-key-2026-production-token-32chars
       - key: COOKIE_SECRET
-        generateValue: true
+        value: knowverse-cookie-secret-signature-key-2026-prod-32chars
       - key: AI_SERVICE_URL
         fromService:
           type: web
