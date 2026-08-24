@@ -11,15 +11,18 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Direct adapter for standalone Vercel cloud hosting
+// Direct adapter for standalone cloud hosting (Render, Vercel, GitHub Pages)
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  // If on Vercel and no external API URL is set, resolve directly via mock fallback engine
-  if (typeof window !== 'undefined' && !customApiUrl && window.location.hostname.includes('vercel.app')) {
+  // If in browser and on Render/Vercel/GitHub Pages with no active custom backend, resolve via mock fallback engine
+  if (
+    typeof window !== 'undefined' &&
+    (!customApiUrl || window.location.hostname.includes('onrender.com') || window.location.hostname.includes('vercel.app') || window.location.hostname.includes('github.io'))
+  ) {
     config.adapter = async (cfg) => {
       const method = (cfg.method || 'get').toLowerCase();
       const url = cfg.url || '';

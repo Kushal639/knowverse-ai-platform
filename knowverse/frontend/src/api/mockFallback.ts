@@ -126,6 +126,7 @@ let stateEntities = [...initialEntities];
 let stateRelations = [...initialRelations];
 let stateTriples = [...initialTriples];
 let stateInsights: any[] = [];
+let activeCurrentUser: User = mockAdminUser;
 
 export function handleMockRoute(url: string, method: string, data?: any): any {
   const cleanUrl = url.replace(/^\/api/, '').split('?')[0];
@@ -133,7 +134,10 @@ export function handleMockRoute(url: string, method: string, data?: any): any {
   // ── Auth ─────────────────────────────────────────────────────────────
   if (cleanUrl === '/auth/login' && method === 'post') {
     const isAdmin = data?.email?.toLowerCase().includes('admin');
-    const user = isAdmin ? mockAdminUser : { ...mockUser, email: data?.email || 'demo@knowverse.dev' };
+    const user = isAdmin
+      ? mockAdminUser
+      : { ...mockUser, email: data?.email || 'demo@knowverse.dev', name: data?.email?.split('@')[0] || 'Explorer' };
+    activeCurrentUser = user;
     return { success: true, data: { user, token: 'mock-jwt-token-active' } };
   }
 
@@ -148,11 +152,12 @@ export function handleMockRoute(url: string, method: string, data?: any): any {
       updatedAt: new Date().toISOString(),
       _count: { datasets: 0, triples: 0, feedback: 0 },
     };
+    activeCurrentUser = user;
     return { success: true, data: { user, token: 'mock-registered-token-active' } };
   }
 
   if (cleanUrl === '/auth/me') {
-    return { success: true, data: mockUser };
+    return { success: true, data: activeCurrentUser };
   }
 
   if (cleanUrl === '/auth/logout') {
