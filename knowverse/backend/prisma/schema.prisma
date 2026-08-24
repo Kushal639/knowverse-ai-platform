@@ -1,0 +1,450 @@
+// KnowVerse — Prisma Schema
+// Database: MySQL 8.0+
+// ORM: Prisma 5.x
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum DatasetStatus {
+  UPLOADED
+  VALIDATING
+  PROCESSING
+  EXTRACTING
+  REVIEWING
+  COMPLETED
+  FAILED
+}
+
+enum TripleStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ExtractionRunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum FeedbackStatus {
+  OPEN
+  REVIEWED
+  CLOSED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ============================================================
+// USERS
+// ============================================================
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  role          Role      @default(USER)
+  avatar        String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  datasets         Dataset[]
+  triples          Triple[]          @relation("TripleCreator")
+  feedback         Feedback[]
+  auditLogs        AuditLog[]
+  graphVersions    GraphVersion[]
+  graphChanges     GraphChange[]
+  aiConversations  AiConversation[]
+  extractionRuns   ExtractionRun[]
+  notifications    Notification[]
+  savedInsights    SavedInsight[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// ============================================================
+// DATASETS
+// ============================================================
+
+model Dataset {
+  id          String        @id @default(uuid())
+  ownerId     String        @map("owner_id")
+  name        String
+  description String?       @db.Text
+  fileName    String?       @map("file_name")
+  fileType    String?       @map("file_type")
+  fileSize    Int?          @map("file_size")
+  filePath    String?       @map("file_path")
+  status      DatasetStatus @default(UPLOADED)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("datasets")
+}
+
+// ============================================================
+// DOCUMENTS
+// ============================================================
+
+model Document {
+  id        String   @id @default(uuid())
+  datasetId String   @map("dataset_id")
+  title     String
+  content   String   @db.LongText
+  source    String?
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  dataset        Dataset         @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  extractionRuns ExtractionRun[]
+  triples        Triple[]
+
+  @@index([datasetId])
+  @@map("documents")
+}
+
+// ============================================================
+// ENTITIES
+// ============================================================
+
+model Entity {
+  id             String   @id @default(uuid())
+  name           String
+  normalizedName String   @map("normalized_name")
+  entityType     String   @default("UNKNOWN") @map("entity_type")
+  description    String?  @db.Text
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  aliases         EntityAlias[]
+  subjectTriples  Triple[]      @relation("SubjectEntity")
+  objectTriples   Triple[]      @relation("ObjectEntity")
+  graphChanges    GraphChange[]
+
+  @@unique([normalizedName])
+  @@index([entityType])
+  @@index([normalizedName])
+  @@map("entities")
+}
+
+model EntityAlias {
+  id       String @id @default(uuid())
+  entityId String @map("entity_id")
+  alias    String
+
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, alias])
+  @@index([alias])
+  @@map("entity_aliases")
+}
+
+// ============================================================
+// RELATIONS
+// ============================================================
+
+model Relation {
+  id             String   @id @default(uuid())
+  name           String
+  normalizedName String   @unique @map("normalized_name")
+  description    String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  triples      Triple[]
+  graphChanges GraphChange[]
+
+  @@index([normalizedName])
+  @@map("relations")
+}
+
+// ============================================================
+// TRIPLES (Knowledge Graph Edges)
+// ============================================================
+
+model Triple {
+  id               String       @id @default(uuid())
+  subjectEntityId  String       @map("subject_entity_id")
+  relationId       String       @map("relation_id")
+  objectEntityId   String       @map("object_entity_id")
+  confidence       Float        @default(0.0)
+  status           TripleStatus @default(PENDING)
+  sourceDocumentId String?      @map("source_document_id")
+  sourceText       String?      @db.Text @map("source_text")
+  extractionModel  String?      @map("extraction_model")
+  createdById      String?      @map("created_by")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  subjectEntity  Entity    @relation("SubjectEntity", fields: [subjectEntityId], references: [id])
+  relation       Relation  @relation(fields: [relationId], references: [id])
+  objectEntity   Entity    @relation("ObjectEntity", fields: [objectEntityId], references: [id])
+  sourceDocument Document? @relation(fields: [sourceDocumentId], references: [id])
+  createdBy      User?     @relation("TripleCreator", fields: [createdById], references: [id])
+
+  @@unique([subjectEntityId, relationId, objectEntityId])
+  @@index([status])
+  @@index([confidence])
+  @@index([subjectEntityId])
+  @@index([objectEntityId])
+  @@map("triples")
+}
+
+// ============================================================
+// EXTRACTION
+// ============================================================
+
+model ExtractionRun {
+  id             String              @id @default(uuid())
+  documentId     String              @map("document_id")
+  userId         String?             @map("user_id")
+  modelName      String              @map("model_name")
+  extractionMode String?             @default("AUTO_DETECT") @map("extraction_mode")
+  metadata       Json?
+  status         ExtractionRunStatus @default(QUEUED)
+  startedAt      DateTime?           @map("started_at")
+  completedAt    DateTime?           @map("completed_at")
+  errorMessage   String?             @db.Text @map("error_message")
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  document Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User?               @relation(fields: [userId], references: [id])
+  results  ExtractionResult[]
+
+  @@index([documentId])
+  @@index([status])
+  @@map("extraction_runs")
+}
+
+model ExtractionResult {
+  id               String       @id @default(uuid())
+  extractionRunId  String       @map("extraction_run_id")
+  subject          String
+  relation         String
+  object           String
+  confidence       Float        @default(0.0)
+  status           TripleStatus @default(PENDING)
+  sourceText       String?      @db.Text @map("source_text")
+  extractionMethod String?      @default("NLP") @map("extraction_method")
+  metadata         Json?
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  extractionRun ExtractionRun @relation(fields: [extractionRunId], references: [id], onDelete: Cascade)
+
+  @@index([extractionRunId])
+  @@index([status])
+  @@map("extraction_results")
+}
+
+// ============================================================
+// GRAPH VERSIONING
+// ============================================================
+
+model GraphVersion {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  createdById String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  createdBy User          @relation(fields: [createdById], references: [id])
+  changes   GraphChange[]
+
+  @@index([createdById])
+  @@map("graph_versions")
+}
+
+model GraphChange {
+  id             String  @id @default(uuid())
+  graphVersionId String  @map("graph_version_id")
+  action         String  // rename_entity | merge_entity | delete_entity | create_entity | edit_relation | etc.
+  entityId       String? @map("entity_id")
+  relationId     String? @map("relation_id")
+  previousValue  Json?   @map("previous_value")
+  newValue       Json?   @map("new_value")
+  createdById    String  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  graphVersion GraphVersion @relation(fields: [graphVersionId], references: [id], onDelete: Cascade)
+  entity       Entity?      @relation(fields: [entityId], references: [id])
+  relation     Relation?    @relation(fields: [relationId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@index([graphVersionId])
+  @@map("graph_changes")
+}
+
+// ============================================================
+// FEEDBACK
+// ============================================================
+
+model Feedback {
+  id            String         @id @default(uuid())
+  userId        String?        @map("user_id")
+  rating        Int
+  comment       String?        @db.Text
+  status        FeedbackStatus @default(OPEN)
+  adminResponse String?        @db.Text @map("admin_response")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([status])
+  @@index([rating])
+  @@map("feedback")
+}
+
+// ============================================================
+// AUDIT LOGS
+// ============================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  details    Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// AI CONVERSATIONS
+// ============================================================
+
+model AiConversation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String   @default("New Conversation")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([userId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String      @id @default(uuid())
+  conversationId String      @map("conversation_id")
+  role           MessageRole
+  content        String      @db.LongText
+  metadata       Json?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("ai_messages")
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+enum NotificationType {
+  EXTRACTION
+  GRAPH
+  SYSTEM
+  QUALITY
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  title     String
+  message   String           @db.Text
+  type      NotificationType @default(SYSTEM)
+  isRead    Boolean          @default(false) @map("is_read")
+  link      String?
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+// ============================================================
+// AI MODEL EVALUATIONS
+// ============================================================
+
+model ModelEvaluation {
+  id               String   @id @default(uuid())
+  modelName        String   @map("model_name")
+  datasetName      String   @map("dataset_name")
+  precision        Float    @default(0.0)
+  recall           Float    @default(0.0)
+  f1Score          Float    @default(0.0) @map("f1_score")
+  entityAccuracy   Float    @default(0.0) @map("entity_accuracy")
+  relationAccuracy Float    @default(0.0) @map("relation_accuracy")
+  avgConfidence    Float    @default(0.0) @map("avg_confidence")
+  testedSamples    Int      @default(0) @map("tested_samples")
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([modelName])
+  @@map("model_evaluations")
+}
+
+// ============================================================
+// SAVED INSIGHTS
+// ============================================================
+
+model SavedInsight {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  question  String   @db.Text
+  answer    String   @db.LongText
+  sources   Json?
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_insights")
+}
+
+

@@ -1,0 +1,8 @@
+{
+  "name": "known-map-rebuild",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix knowverse/frontend install && npm --prefix knowverse/frontend run build"
+  }
+}
