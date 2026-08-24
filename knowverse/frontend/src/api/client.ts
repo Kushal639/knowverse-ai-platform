@@ -2,7 +2,11 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 import { handleMockRoute } from './mockFallback';
 
-const customApiUrl = (import.meta as any).env?.VITE_API_URL;
+const defaultApiUrl = typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')
+  ? 'https://knowverse-backend-ae0x.onrender.com'
+  : '';
+const customApiUrl = (import.meta as any).env?.VITE_API_URL || defaultApiUrl;
+
 const apiClient = axios.create({
   baseURL: customApiUrl
     ? (customApiUrl.endsWith('/api') ? customApiUrl : `${customApiUrl}/api`)
@@ -11,31 +15,11 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Direct adapter for standalone cloud hosting (Render, Vercel, GitHub Pages)
+// Request interceptor attaches token to real backend calls
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  // If in browser and on Render/Vercel/GitHub Pages with no active custom backend, resolve via mock fallback engine
-  if (
-    typeof window !== 'undefined' &&
-    (!customApiUrl || window.location.hostname.includes('onrender.com') || window.location.hostname.includes('vercel.app') || window.location.hostname.includes('github.io'))
-  ) {
-    config.adapter = async (cfg) => {
-      const method = (cfg.method || 'get').toLowerCase();
-      const url = cfg.url || '';
-      const bodyData = cfg.data ? (typeof cfg.data === 'string' ? JSON.parse(cfg.data) : cfg.data) : undefined;
-      const mockData = handleMockRoute(url, method, bodyData);
-      return {
-        data: mockData,
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: cfg,
-      };
-    };
   }
 
   return config;
