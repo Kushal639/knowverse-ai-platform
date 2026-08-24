@@ -9,8 +9,9 @@
 ---
 
 ## 🚀 Live Deployment
-- **Live Production URL**: [https://frontend-three-pi-48.vercel.app](https://frontend-three-pi-48.vercel.app)
-- **Alternative Vercel URL**: [https://frontend-cftemm1li-kushal639s-projects.vercel.app](https://frontend-cftemm1li-kushal639s-projects.vercel.app)
+- **Live Render Production URL**: [https://knowverse-frontend.onrender.com](https://knowverse-frontend.onrender.com)
+- **Live Render Backend API**: [https://knowverse-backend-ae0x.onrender.com](https://knowverse-backend-ae0x.onrender.com)
+- **Live Render AI Microservice**: [https://knowverse-ai.onrender.com](https://knowverse-ai.onrender.com)
 - **GitHub Repository**: [https://github.com/Kushal639/knowverse-ai-platform](https://github.com/Kushal639/knowverse-ai-platform)
 
 ---
