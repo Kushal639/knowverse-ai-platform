@@ -32,7 +32,7 @@ app.add_middleware(
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "knowverse-ai"}
 
 # Load spaCy model on startup
 nlp = None

@@ -1,0 +1,88 @@
+services:
+  # ─────────────────────────────────────────────────────────────
+  # 1. MySQL Database (Private Service with Persistent Disk)
+  # ─────────────────────────────────────────────────────────────
+  - type: pserv
+    name: knowverse-mysql
+    env: docker
+    dockerContext: .
+    dockerfilePath: Dockerfile.mysql
+    plan: starter
+    disk:
+      name: mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - key: MYSQL_DATABASE
+        value: knowverse
+      - key: MYSQL_USER
+        value: knowverse_user
+      - key: MYSQL_PASSWORD
+        generateValue: true
+      - key: MYSQL_ROOT_PASSWORD
+        generateValue: true
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Python AI / NLP Microservice (Web Service)
+  # ─────────────────────────────────────────────────────────────
+  - type: web
+    name: knowverse-ai
+    env: python
+    rootDir: knowverse/ai-service
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Node.js Express Backend API (Web Service)
+  # ─────────────────────────────────────────────────────────────
+  - type: web
+    name: knowverse-backend
+    env: node
+    rootDir: knowverse/backend
+    plan: starter
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma db push && node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: knowverse-mysql
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: knowverse-ai
+          property: host
+      - key: FRONTEND_URL
+        value: https://knowverse-frontend.onrender.com
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. React + Vite Frontend (Static Site)
+  # ─────────────────────────────────────────────────────────────
+  - type: static
+    name: knowverse-frontend
+    rootDir: knowverse/frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: knowverse-backend
+          property: host
