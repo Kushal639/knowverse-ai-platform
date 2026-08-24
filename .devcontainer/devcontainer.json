@@ -1,0 +1,36 @@
+{
+  "name": "KnowVerse Full-Stack Platform",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [5173, 3001, 8000, 3306],
+  "portsAttributes": {
+    "5173": {
+      "label": "Frontend UI",
+      "onAutoForward": "openBrowser"
+    },
+    "3001": {
+      "label": "Backend API",
+      "onAutoForward": "silent"
+    },
+    "8000": {
+      "label": "AI Microservice",
+      "onAutoForward": "silent"
+    },
+    "3306": {
+      "label": "MySQL Database",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-python.python",
+        "Prisma.prisma"
+      ]
+    }
+  }
+}
