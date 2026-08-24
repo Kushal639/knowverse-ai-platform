@@ -69,3 +69,5 @@ Thumbs.db
 # Turborepo / Cache
 .turbo
 .cache
+
+.vercel
