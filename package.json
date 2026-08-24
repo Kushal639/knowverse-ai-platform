@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "npm --prefix knowverse/frontend install && npm --prefix knowverse/frontend run build"
+    "build": "npm --prefix knowverse/frontend install && npm --prefix knowverse/frontend run build && node -e \"const fs=require('fs'); fs.cpSync('knowverse/frontend/dist', 'dist', {recursive: true});\""
   }
 }
