@@ -22,17 +22,26 @@ apiClient.interceptors.request.use((config) => {
 
 // Response interceptor with graceful mock fallback for standalone / Vercel cloud deployment
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Detect if Vercel SPA rewrite returned index.html for an API route
+    if (typeof response.data === 'string' && (response.data.includes('<!DOCTYPE html>') || response.data.includes('<!doctype html>') || response.data.includes('<html'))) {
+      const method = (response.config.method || 'get').toLowerCase();
+      const url = response.config.url || '';
+      const bodyData = response.config.data ? (typeof response.config.data === 'string' ? JSON.parse(response.config.data) : response.config.data) : undefined;
+      const mockData = handleMockRoute(url, method, bodyData);
+      return { ...response, data: mockData };
+    }
+    return response;
+  },
   (error) => {
-    // If backend is unreachable or returns 404 / 502 / Network Error (e.g. static Vercel host without live backend server)
-    const isNetworkError = !error.response || error.code === 'ERR_NETWORK' || error.response?.status === 404 || error.response?.status === 502;
-    if (isNetworkError && error.config) {
+    // If backend is unreachable or returns 405 (Method Not Allowed on static Vercel), 404, 500, 502, or Network Error
+    if (error.config) {
       try {
         const method = (error.config.method || 'get').toLowerCase();
         const url = error.config.url || '';
         const bodyData = error.config.data ? (typeof error.config.data === 'string' ? JSON.parse(error.config.data) : error.config.data) : undefined;
         const mockData = handleMockRoute(url, method, bodyData);
-        if (mockData) {
+        if (mockData !== undefined) {
           return Promise.resolve({ data: mockData, status: 200, statusText: 'OK', headers: {}, config: error.config });
         }
       } catch (e) {
